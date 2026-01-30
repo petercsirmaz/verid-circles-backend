@@ -1,15 +1,9 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 
-type User = {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  password: string;
-  verified: boolean;
-  createdAt: Date;
-};
+import { users, verificationCodes, sessions, resetAuthStore } from '../store/auth';
+import type { User } from '../store/auth';
+import { requireAuth, AuthenticatedRequest } from '../middleware/auth';
 
 type RegisterRequest = {
   firstName: string;
@@ -37,10 +31,6 @@ type ErrorResponse = {
   error: string;
   field?: string;
 };
-
-const users: User[] = [];
-const verificationCodes: Map<string, string> = new Map();
-const sessions: Map<string, string> = new Map();
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -190,42 +180,38 @@ router.post('/login', (req: Request, res: Response) => {
 });
 
 router.post('/set-password', (req: Request, res: Response) => {
-  const authHeader = req.header('authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return sendError(res, 401, { error: 'Authorization token is required.' });
-  }
+  return requireAuth(req, res, () => {
+    const { password, confirmPassword } = sanitizeSetPassword(
+      req.body as SetPasswordRequest
+    );
 
-  const token = authHeader.replace('Bearer ', '').trim();
-  const email = sessions.get(token);
-  if (!email) {
-    return sendError(res, 403, { error: 'Invalid session token.' });
-  }
+    if (!password) {
+      return sendError(res, 400, { error: 'Password is required.', field: 'password' });
+    }
+    if (!confirmPassword) {
+      return sendError(res, 400, { error: 'Confirm password is required.', field: 'confirmPassword' });
+    }
+    if (password.length < 8) {
+      return sendError(res, 400, { error: 'Password must be at least 8 characters.', field: 'password' });
+    }
+    if (password !== confirmPassword) {
+      return sendError(res, 400, { error: 'Passwords do not match.', field: 'confirmPassword' });
+    }
 
-  const { password, confirmPassword } = sanitizeSetPassword(
-    req.body as SetPasswordRequest
-  );
+    const email = (req as AuthenticatedRequest).userEmail;
+    if (!email) {
+      return sendError(res, 403, { error: 'Invalid session token.' });
+    }
 
-  if (!password) {
-    return sendError(res, 400, { error: 'Password is required.', field: 'password' });
-  }
-  if (!confirmPassword) {
-    return sendError(res, 400, { error: 'Confirm password is required.', field: 'confirmPassword' });
-  }
-  if (password.length < 8) {
-    return sendError(res, 400, { error: 'Password must be at least 8 characters.', field: 'password' });
-  }
-  if (password !== confirmPassword) {
-    return sendError(res, 400, { error: 'Passwords do not match.', field: 'confirmPassword' });
-  }
+    const user = users.find((entry) => entry.email === email);
+    if (!user) {
+      return sendError(res, 404, { error: 'User not found.', field: 'email' });
+    }
 
-  const user = users.find((entry) => entry.email === email);
-  if (!user) {
-    return sendError(res, 404, { error: 'User not found.', field: 'email' });
-  }
+    user.password = password;
 
-  user.password = password;
-
-  res.status(200).json({ message: 'Password updated successfully.' });
+    return res.status(200).json({ message: 'Password updated successfully.' });
+  });
 });
 
 export { router as authRouter };
@@ -233,9 +219,5 @@ export const __authTest = {
   users,
   verificationCodes,
   sessions,
-  reset() {
-    users.length = 0;
-    verificationCodes.clear();
-    sessions.clear();
-  },
+  reset: resetAuthStore,
 };

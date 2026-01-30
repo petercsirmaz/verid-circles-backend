@@ -264,6 +264,19 @@ describe('POST /api/auth/set-password', () => {
     expect(response.body.error).toBeDefined();
   });
 
+  it('rejects invalid auth token', async () => {
+    const response = await request(app)
+      .post('/api/auth/set-password')
+      .set('Authorization', 'Bearer invalid-token')
+      .send({
+        password: 'newpassword123',
+        confirmPassword: 'newpassword123',
+      });
+
+    expect(response.status).toBe(403);
+    expect(response.body.error).toBeDefined();
+  });
+
   it('rejects mismatched passwords', async () => {
     const email = `mismatch.user.${Date.now()}@example.com`;
 
@@ -294,5 +307,40 @@ describe('POST /api/auth/set-password', () => {
 
     expect(response.status).toBe(400);
     expect(response.body.field).toBe('confirmPassword');
+  });
+});
+
+describe('Auth middleware', () => {
+  beforeEach(() => {
+    __authTest.reset();
+  });
+
+  it('attaches user email to request', async () => {
+    const email = `middleware.user.${Date.now()}@example.com`;
+
+    await request(app).post('/api/auth/register').send({
+      firstName: 'Middleware',
+      lastName: 'User',
+      email,
+      password: 'password123',
+    });
+
+    const code = __authTest.verificationCodes.get(email);
+    expect(code).toBeDefined();
+
+    const verifyResponse = await request(app).post('/api/auth/verify-code').send({
+      email,
+      code,
+    });
+
+    const token = verifyResponse.body.token;
+    expect(token).toBeDefined();
+
+    const response = await request(app)
+      .get('/__test/auth-email')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.email).toBe(email);
   });
 });
