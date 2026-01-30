@@ -230,6 +230,15 @@ router.get('/me', requireAuth, (req: Request, res: Response) => {
   return res.status(200).json({ user: safeUser });
 });
 
+router.post('/logout', requireAuth, (req: Request, res: Response) => {
+  const authHeader = req.header('authorization') ?? '';
+  const token = authHeader.replace('Bearer ', '').trim();
+  if (token) {
+    sessions.delete(token);
+  }
+  return res.status(200).json({ message: 'Logged out successfully.' });
+});
+
 export { router as authRouter };
 export const __authTest = {
   users,
