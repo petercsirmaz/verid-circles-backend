@@ -344,3 +344,46 @@ describe('Auth middleware', () => {
     expect(response.body.email).toBe(email);
   });
 });
+
+describe('GET /api/auth/me', () => {
+  beforeEach(() => {
+    __authTest.reset();
+  });
+
+  it('returns current user for authenticated request', async () => {
+    const email = `me.user.${Date.now()}@example.com`;
+
+    await request(app).post('/api/auth/register').send({
+      firstName: 'Me',
+      lastName: 'User',
+      email,
+      password: 'password123',
+    });
+
+    const code = __authTest.verificationCodes.get(email);
+    expect(code).toBeDefined();
+
+    const verifyResponse = await request(app).post('/api/auth/verify-code').send({
+      email,
+      code,
+    });
+
+    const token = verifyResponse.body.token;
+    expect(token).toBeDefined();
+
+    const response = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.user).toBeDefined();
+    expect(response.body.user.email).toBe(email);
+  });
+
+  it('rejects request without token', async () => {
+    const response = await request(app).get('/api/auth/me');
+
+    expect(response.status).toBe(401);
+    expect(response.body.error).toBeDefined();
+  });
+});

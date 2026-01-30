@@ -214,6 +214,22 @@ router.post('/set-password', (req: Request, res: Response) => {
   });
 });
 
+router.get('/me', requireAuth, (req: Request, res: Response) => {
+  const email = (req as AuthenticatedRequest).userEmail;
+  if (!email) {
+    return sendError(res, 403, { error: 'Invalid session token.' });
+  }
+
+  const user = users.find((entry) => entry.email === email);
+  if (!user) {
+    return sendError(res, 404, { error: 'User not found.', field: 'email' });
+  }
+
+  const { password: _password, ...safeUser } = user;
+  void _password;
+  return res.status(200).json({ user: safeUser });
+});
+
 export { router as authRouter };
 export const __authTest = {
   users,
