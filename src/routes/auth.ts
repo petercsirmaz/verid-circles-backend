@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import crypto from 'crypto';
 
 type User = {
   id: string;
@@ -17,6 +18,11 @@ type RegisterRequest = {
   password: string;
 };
 
+type VerifyCodeRequest = {
+  email: string;
+  code: string;
+};
+
 type ErrorResponse = {
   error: string;
   field?: string;
@@ -24,6 +30,7 @@ type ErrorResponse = {
 
 const users: User[] = [];
 const verificationCodes: Map<string, string> = new Map();
+const sessions: Map<string, string> = new Map();
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -36,6 +43,11 @@ const sanitizeRegister = (body: RegisterRequest) => ({
   lastName: body.lastName?.trim(),
   email: body.email?.trim().toLowerCase(),
   password: body.password ?? '',
+});
+
+const sanitizeVerifyCode = (body: VerifyCodeRequest) => ({
+  email: body.email?.trim().toLowerCase(),
+  code: body.code?.trim(),
 });
 
 const router = Router();
@@ -88,4 +100,51 @@ router.post('/register', (req: Request, res: Response) => {
   res.status(201).json({ user: safeUser });
 });
 
+router.post('/verify-code', (req: Request, res: Response) => {
+  const { email, code } = sanitizeVerifyCode(req.body as VerifyCodeRequest);
+
+  if (!email) {
+    return sendError(res, 400, { error: 'Email is required.', field: 'email' });
+  }
+  if (!emailRegex.test(email)) {
+    return sendError(res, 400, { error: 'Email format is invalid.', field: 'email' });
+  }
+  if (!code) {
+    return sendError(res, 400, { error: 'Verification code is required.', field: 'code' });
+  }
+
+  const expectedCode = verificationCodes.get(email);
+  if (!expectedCode) {
+    return sendError(res, 400, { error: 'Verification code not found.', field: 'code' });
+  }
+  if (expectedCode !== code) {
+    return sendError(res, 400, { error: 'Verification code is invalid.', field: 'code' });
+  }
+
+  const user = users.find((entry) => entry.email === email);
+  if (!user) {
+    return sendError(res, 404, { error: 'User not found.', field: 'email' });
+  }
+
+  user.verified = true;
+  verificationCodes.delete(email);
+
+  const token = crypto.randomUUID();
+  sessions.set(token, email);
+
+  const { password: _password, ...safeUser } = user;
+  void _password;
+  res.status(200).json({ user: safeUser, token });
+});
+
 export { router as authRouter };
+export const __authTest = {
+  users,
+  verificationCodes,
+  sessions,
+  reset() {
+    users.length = 0;
+    verificationCodes.clear();
+    sessions.clear();
+  },
+};
