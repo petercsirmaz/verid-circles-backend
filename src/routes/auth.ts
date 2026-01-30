@@ -28,6 +28,11 @@ type LoginRequest = {
   password: string;
 };
 
+type SetPasswordRequest = {
+  password: string;
+  confirmPassword: string;
+};
+
 type ErrorResponse = {
   error: string;
   field?: string;
@@ -58,6 +63,11 @@ const sanitizeVerifyCode = (body: VerifyCodeRequest) => ({
 const sanitizeLogin = (body: LoginRequest) => ({
   email: body.email?.trim().toLowerCase(),
   password: body.password ?? '',
+});
+
+const sanitizeSetPassword = (body: SetPasswordRequest) => ({
+  password: body.password ?? '',
+  confirmPassword: body.confirmPassword ?? '',
 });
 
 const router = Router();
@@ -177,6 +187,45 @@ router.post('/login', (req: Request, res: Response) => {
   const { password: _password, ...safeUser } = user;
   void _password;
   res.status(200).json({ user: safeUser, token });
+});
+
+router.post('/set-password', (req: Request, res: Response) => {
+  const authHeader = req.header('authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return sendError(res, 401, { error: 'Authorization token is required.' });
+  }
+
+  const token = authHeader.replace('Bearer ', '').trim();
+  const email = sessions.get(token);
+  if (!email) {
+    return sendError(res, 403, { error: 'Invalid session token.' });
+  }
+
+  const { password, confirmPassword } = sanitizeSetPassword(
+    req.body as SetPasswordRequest
+  );
+
+  if (!password) {
+    return sendError(res, 400, { error: 'Password is required.', field: 'password' });
+  }
+  if (!confirmPassword) {
+    return sendError(res, 400, { error: 'Confirm password is required.', field: 'confirmPassword' });
+  }
+  if (password.length < 8) {
+    return sendError(res, 400, { error: 'Password must be at least 8 characters.', field: 'password' });
+  }
+  if (password !== confirmPassword) {
+    return sendError(res, 400, { error: 'Passwords do not match.', field: 'confirmPassword' });
+  }
+
+  const user = users.find((entry) => entry.email === email);
+  if (!user) {
+    return sendError(res, 404, { error: 'User not found.', field: 'email' });
+  }
+
+  user.password = password;
+
+  res.status(200).json({ message: 'Password updated successfully.' });
 });
 
 export { router as authRouter };

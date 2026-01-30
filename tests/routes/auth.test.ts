@@ -215,3 +215,84 @@ describe('POST /api/auth/login', () => {
     expect(response.body.field).toBe('password');
   });
 });
+
+describe('POST /api/auth/set-password', () => {
+  beforeEach(() => {
+    __authTest.reset();
+  });
+
+  it('updates password for authenticated user', async () => {
+    const email = `setpass.user.${Date.now()}@example.com`;
+
+    await request(app).post('/api/auth/register').send({
+      firstName: 'Set',
+      lastName: 'Password',
+      email,
+      password: 'password123',
+    });
+
+    const code = __authTest.verificationCodes.get(email);
+    expect(code).toBeDefined();
+
+    const verifyResponse = await request(app).post('/api/auth/verify-code').send({
+      email,
+      code,
+    });
+
+    const token = verifyResponse.body.token;
+    expect(token).toBeDefined();
+
+    const response = await request(app)
+      .post('/api/auth/set-password')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        password: 'newpassword123',
+        confirmPassword: 'newpassword123',
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.message).toBeDefined();
+  });
+
+  it('rejects missing auth token', async () => {
+    const response = await request(app).post('/api/auth/set-password').send({
+      password: 'newpassword123',
+      confirmPassword: 'newpassword123',
+    });
+
+    expect(response.status).toBe(401);
+    expect(response.body.error).toBeDefined();
+  });
+
+  it('rejects mismatched passwords', async () => {
+    const email = `mismatch.user.${Date.now()}@example.com`;
+
+    await request(app).post('/api/auth/register').send({
+      firstName: 'Mismatch',
+      lastName: 'User',
+      email,
+      password: 'password123',
+    });
+
+    const code = __authTest.verificationCodes.get(email);
+    expect(code).toBeDefined();
+
+    const verifyResponse = await request(app).post('/api/auth/verify-code').send({
+      email,
+      code,
+    });
+
+    const token = verifyResponse.body.token;
+
+    const response = await request(app)
+      .post('/api/auth/set-password')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        password: 'newpassword123',
+        confirmPassword: 'newpassword000',
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.field).toBe('confirmPassword');
+  });
+});
