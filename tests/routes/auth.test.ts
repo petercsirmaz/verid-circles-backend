@@ -122,3 +122,96 @@ describe('POST /api/auth/verify-code', () => {
     expect(response.body.field).toBe('code');
   });
 });
+
+describe('POST /api/auth/login', () => {
+  beforeEach(() => {
+    __authTest.reset();
+  });
+
+  it('logs in a verified user and returns a token', async () => {
+    const email = `login.user.${Date.now()}@example.com`;
+    const password = 'password123';
+
+    await request(app).post('/api/auth/register').send({
+      firstName: 'Login',
+      lastName: 'User',
+      email,
+      password,
+    });
+
+    const code = __authTest.verificationCodes.get(email);
+    expect(code).toBeDefined();
+
+    await request(app).post('/api/auth/verify-code').send({
+      email,
+      code,
+    });
+
+    const response = await request(app).post('/api/auth/login').send({
+      email,
+      password,
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body.token).toBeDefined();
+    expect(response.body.user).toBeDefined();
+    expect(response.body.user.email).toBe(email);
+  });
+
+  it('rejects login for unverified user', async () => {
+    const email = `unverified.user.${Date.now()}@example.com`;
+
+    await request(app).post('/api/auth/register').send({
+      firstName: 'Unverified',
+      lastName: 'User',
+      email,
+      password: 'password123',
+    });
+
+    const response = await request(app).post('/api/auth/login').send({
+      email,
+      password: 'password123',
+    });
+
+    expect(response.status).toBe(403);
+    expect(response.body.error).toBeDefined();
+    expect(response.body.field).toBe('email');
+  });
+
+  it('rejects invalid password', async () => {
+    const email = `wrongpass.user.${Date.now()}@example.com`;
+
+    await request(app).post('/api/auth/register').send({
+      firstName: 'Wrong',
+      lastName: 'Password',
+      email,
+      password: 'password123',
+    });
+
+    const code = __authTest.verificationCodes.get(email);
+    expect(code).toBeDefined();
+
+    await request(app).post('/api/auth/verify-code').send({
+      email,
+      code,
+    });
+
+    const response = await request(app).post('/api/auth/login').send({
+      email,
+      password: 'password000',
+    });
+
+    expect(response.status).toBe(401);
+    expect(response.body.error).toBeDefined();
+    expect(response.body.field).toBe('password');
+  });
+
+  it('returns 400 when password is missing', async () => {
+    const response = await request(app).post('/api/auth/login').send({
+      email: 'missing.password@example.com',
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.body.field).toBe('password');
+  });
+});

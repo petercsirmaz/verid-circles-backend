@@ -23,6 +23,11 @@ type VerifyCodeRequest = {
   code: string;
 };
 
+type LoginRequest = {
+  email: string;
+  password: string;
+};
+
 type ErrorResponse = {
   error: string;
   field?: string;
@@ -48,6 +53,11 @@ const sanitizeRegister = (body: RegisterRequest) => ({
 const sanitizeVerifyCode = (body: VerifyCodeRequest) => ({
   email: body.email?.trim().toLowerCase(),
   code: body.code?.trim(),
+});
+
+const sanitizeLogin = (body: LoginRequest) => ({
+  email: body.email?.trim().toLowerCase(),
+  password: body.password ?? '',
 });
 
 const router = Router();
@@ -128,6 +138,38 @@ router.post('/verify-code', (req: Request, res: Response) => {
 
   user.verified = true;
   verificationCodes.delete(email);
+
+  const token = crypto.randomUUID();
+  sessions.set(token, email);
+
+  const { password: _password, ...safeUser } = user;
+  void _password;
+  res.status(200).json({ user: safeUser, token });
+});
+
+router.post('/login', (req: Request, res: Response) => {
+  const { email, password } = sanitizeLogin(req.body as LoginRequest);
+
+  if (!email) {
+    return sendError(res, 400, { error: 'Email is required.', field: 'email' });
+  }
+  if (!emailRegex.test(email)) {
+    return sendError(res, 400, { error: 'Email format is invalid.', field: 'email' });
+  }
+  if (!password) {
+    return sendError(res, 400, { error: 'Password is required.', field: 'password' });
+  }
+
+  const user = users.find((entry) => entry.email === email);
+  if (!user) {
+    return sendError(res, 401, { error: 'Invalid credentials.', field: 'email' });
+  }
+  if (user.password !== password) {
+    return sendError(res, 401, { error: 'Invalid credentials.', field: 'password' });
+  }
+  if (!user.verified) {
+    return sendError(res, 403, { error: 'Account is not verified.', field: 'email' });
+  }
 
   const token = crypto.randomUUID();
   sessions.set(token, email);
