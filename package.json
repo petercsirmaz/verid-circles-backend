@@ -25,7 +25,8 @@
   "homepage": "https://github.com/petercsirmaz/verid-circles-backend#readme",
   "dependencies": {
     "cors": "^2.8.6",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "libphonenumber-js": "^1.12.36"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

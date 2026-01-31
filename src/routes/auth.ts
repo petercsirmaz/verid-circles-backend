@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
+import { parsePhoneNumberFromString } from 'libphonenumber-js';
 
 import { users, verificationCodes, sessions, resetAuthStore } from '../store/auth';
 import type { User } from '../store/auth';
@@ -9,6 +10,7 @@ type RegisterRequest = {
   firstName: string;
   lastName: string;
   email: string;
+  phoneNumber: string;
   password: string;
 };
 
@@ -42,6 +44,7 @@ const sanitizeRegister = (body: RegisterRequest) => ({
   firstName: body.firstName?.trim(),
   lastName: body.lastName?.trim(),
   email: body.email?.trim().toLowerCase(),
+  phoneNumber: body.phoneNumber?.trim(),
   password: body.password ?? '',
 });
 
@@ -63,7 +66,7 @@ const sanitizeSetPassword = (body: SetPasswordRequest) => ({
 const router = Router();
 
 router.post('/register', (req: Request, res: Response) => {
-  const { firstName, lastName, email, password } = sanitizeRegister(
+  const { firstName, lastName, email, phoneNumber, password } = sanitizeRegister(
     req.body as RegisterRequest
   );
 
@@ -78,6 +81,13 @@ router.post('/register', (req: Request, res: Response) => {
   }
   if (!emailRegex.test(email)) {
     return sendError(res, 400, { error: 'Email format is invalid.', field: 'email' });
+  }
+  if (!phoneNumber) {
+    return sendError(res, 400, { error: 'Phone number is required.', field: 'phoneNumber' });
+  }
+  const parsed = parsePhoneNumberFromString(phoneNumber);
+  if (!parsed || !parsed.isValid()) {
+    return sendError(res, 400, { error: 'Phone number is invalid.', field: 'phoneNumber' });
   }
   if (!password) {
     return sendError(res, 400, { error: 'Password is required.', field: 'password' });
@@ -96,6 +106,7 @@ router.post('/register', (req: Request, res: Response) => {
     email,
     firstName,
     lastName,
+    phoneNumber,
     password,
     verified: false,
     createdAt: new Date(),

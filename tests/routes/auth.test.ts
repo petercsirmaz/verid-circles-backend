@@ -10,6 +10,7 @@ describe('POST /api/auth/register', () => {
 
   it('creates a user and omits password in response', async () => {
     const email = `test.user.${Date.now()}@example.com`;
+    const phoneNumber = '+14155552671';
 
     const response = await request(app)
       .post('/api/auth/register')
@@ -17,12 +18,14 @@ describe('POST /api/auth/register', () => {
         firstName: 'Test',
         lastName: 'User',
         email,
+        phoneNumber,
         password: 'password123',
       });
 
     expect(response.status).toBe(201);
     expect(response.body.user).toBeDefined();
     expect(response.body.user.email).toBe(email);
+    expect(response.body.user.phoneNumber).toBe(phoneNumber);
     expect(response.body.user.password).toBeUndefined();
   });
 
@@ -33,6 +36,7 @@ describe('POST /api/auth/register', () => {
         firstName: 'Test',
         lastName: 'User',
         email: 'not-an-email',
+        phoneNumber: '+14155552672',
         password: 'password123',
       });
 
@@ -41,13 +45,44 @@ describe('POST /api/auth/register', () => {
     expect(response.body.field).toBe('email');
   });
 
+  it('rejects invalid phone number', async () => {
+    const response = await request(app)
+      .post('/api/auth/register')
+      .send({
+        firstName: 'Test',
+        lastName: 'User',
+        email: `phone.user.${Date.now()}@example.com`,
+        phoneNumber: '12345',
+        password: 'password123',
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.field).toBe('phoneNumber');
+  });
+
+  it('rejects missing phone number', async () => {
+    const response = await request(app)
+      .post('/api/auth/register')
+      .send({
+        firstName: 'Test',
+        lastName: 'User',
+        email: `nophone.user.${Date.now()}@example.com`,
+        password: 'password123',
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.field).toBe('phoneNumber');
+  });
+
   it('rejects duplicate email', async () => {
     const email = `dupe.user.${Date.now()}@example.com`;
+    const phoneNumber = '+14155552673';
 
     await request(app).post('/api/auth/register').send({
       firstName: 'Dupe',
       lastName: 'User',
       email,
+      phoneNumber,
       password: 'password123',
     });
 
@@ -55,6 +90,7 @@ describe('POST /api/auth/register', () => {
       firstName: 'Dupe',
       lastName: 'User',
       email,
+      phoneNumber,
       password: 'password123',
     });
 
@@ -76,6 +112,7 @@ describe('POST /api/auth/verify-code', () => {
       firstName: 'Verify',
       lastName: 'User',
       email,
+      phoneNumber: '+14155552674',
       password: 'password123',
     });
 
@@ -100,6 +137,7 @@ describe('POST /api/auth/verify-code', () => {
       firstName: 'Bad',
       lastName: 'Code',
       email,
+      phoneNumber: '+14155552675',
       password: 'password123',
     });
 
@@ -136,6 +174,7 @@ describe('POST /api/auth/login', () => {
       firstName: 'Login',
       lastName: 'User',
       email,
+      phoneNumber: '+14155552676',
       password,
     });
 
@@ -165,6 +204,7 @@ describe('POST /api/auth/login', () => {
       firstName: 'Unverified',
       lastName: 'User',
       email,
+      phoneNumber: '+14155552677',
       password: 'password123',
     });
 
@@ -185,6 +225,7 @@ describe('POST /api/auth/login', () => {
       firstName: 'Wrong',
       lastName: 'Password',
       email,
+      phoneNumber: '+14155552678',
       password: 'password123',
     });
 
@@ -228,6 +269,7 @@ describe('POST /api/auth/set-password', () => {
       firstName: 'Set',
       lastName: 'Password',
       email,
+      phoneNumber: '+14155552679',
       password: 'password123',
     });
 
@@ -284,6 +326,7 @@ describe('POST /api/auth/set-password', () => {
       firstName: 'Mismatch',
       lastName: 'User',
       email,
+      phoneNumber: '+14155552680',
       password: 'password123',
     });
 
@@ -322,6 +365,7 @@ describe('Auth middleware', () => {
       firstName: 'Middleware',
       lastName: 'User',
       email,
+      phoneNumber: '+14155552681',
       password: 'password123',
     });
 
@@ -357,6 +401,7 @@ describe('GET /api/auth/me', () => {
       firstName: 'Me',
       lastName: 'User',
       email,
+      phoneNumber: '+14155552682',
       password: 'password123',
     });
 
@@ -400,6 +445,7 @@ describe('POST /api/auth/logout', () => {
       firstName: 'Logout',
       lastName: 'User',
       email,
+      phoneNumber: '+14155552683',
       password: 'password123',
     });
 

@@ -18,11 +18,12 @@ const openapi: OpenAPIV3.Document = {
     schemas: {
       RegisterRequest: {
         type: 'object',
-        required: ['firstName', 'lastName', 'email', 'password'],
+        required: ['firstName', 'lastName', 'email', 'phoneNumber', 'password'],
         properties: {
           firstName: { type: 'string' },
           lastName: { type: 'string' },
           email: { type: 'string', format: 'email' },
+          phoneNumber: { type: 'string' },
           password: { type: 'string', minLength: 8 },
         },
       },
@@ -57,6 +58,7 @@ const openapi: OpenAPIV3.Document = {
           email: { type: 'string', format: 'email' },
           firstName: { type: 'string' },
           lastName: { type: 'string' },
+          phoneNumber: { type: 'string' },
           verified: { type: 'boolean' },
           createdAt: { type: 'string', format: 'date-time' },
         },
