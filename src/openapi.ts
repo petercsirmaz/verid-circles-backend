@@ -29,9 +29,9 @@ const openapi: OpenAPIV3.Document = {
       },
       VerifyCodeRequest: {
         type: 'object',
-        required: ['email', 'code'],
+        required: ['verificationId', 'code'],
         properties: {
-          email: { type: 'string', format: 'email' },
+          verificationId: { type: 'string' },
           code: { type: 'string', minLength: 6, maxLength: 6 },
         },
       },
@@ -51,6 +51,22 @@ const openapi: OpenAPIV3.Document = {
           confirmPassword: { type: 'string', minLength: 8 },
         },
       },
+      ForgotPasswordRequest: {
+        type: 'object',
+        required: ['email'],
+        properties: {
+          email: { type: 'string', format: 'email' },
+        },
+      },
+      ResetPasswordRequest: {
+        type: 'object',
+        required: ['token', 'password', 'confirmPassword'],
+        properties: {
+          token: { type: 'string' },
+          password: { type: 'string', minLength: 8 },
+          confirmPassword: { type: 'string', minLength: 8 },
+        },
+      },
       User: {
         type: 'object',
         properties: {
@@ -59,8 +75,15 @@ const openapi: OpenAPIV3.Document = {
           firstName: { type: 'string' },
           lastName: { type: 'string' },
           phoneNumber: { type: 'string' },
+          verificationId: { type: 'string' },
           verified: { type: 'boolean' },
           createdAt: { type: 'string', format: 'date-time' },
+        },
+      },
+      VerificationStatusResponse: {
+        type: 'object',
+        properties: {
+          verified: { type: 'boolean' },
         },
       },
       AuthResponse: {
@@ -80,6 +103,7 @@ const openapi: OpenAPIV3.Document = {
         type: 'object',
         properties: {
           message: { type: 'string' },
+          token: { type: 'string' },
         },
       },
       ErrorResponse: {
@@ -87,6 +111,7 @@ const openapi: OpenAPIV3.Document = {
         properties: {
           error: { type: 'string' },
           field: { type: 'string' },
+          verificationId: { type: 'string' },
         },
       },
     },
@@ -216,6 +241,61 @@ const openapi: OpenAPIV3.Document = {
           '200': { description: 'Logged out', content: { 'application/json': { schema: { $ref: '#/components/schemas/MessageResponse' } } } },
           '401': { description: 'Missing token', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
           '403': { description: 'Invalid token', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+        },
+      },
+    },
+    '/api/auth/verification-status': {
+      get: {
+        summary: 'Check verification status',
+        parameters: [
+          {
+            name: 'verificationId',
+            in: 'query',
+            required: true,
+            schema: { type: 'string' },
+          },
+        ],
+        responses: {
+          '200': { description: 'Verification status', content: { 'application/json': { schema: { $ref: '#/components/schemas/VerificationStatusResponse' } } } },
+          '400': { description: 'Validation error', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          '404': { description: 'User not found', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+        },
+      },
+    },
+    '/api/auth/forgot-password': {
+      post: {
+        summary: 'Request password reset',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/ForgotPasswordRequest' },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Reset email sent', content: { 'application/json': { schema: { $ref: '#/components/schemas/MessageResponse' } } } },
+          '400': { description: 'Validation error', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          '404': { description: 'User not found', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+        },
+      },
+    },
+    '/api/auth/reset-password': {
+      post: {
+        summary: 'Reset password with token',
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/ResetPasswordRequest' },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'Password reset', content: { 'application/json': { schema: { $ref: '#/components/schemas/MessageResponse' } } } },
+          '400': { description: 'Validation error', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          '403': { description: 'Invalid token', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
+          '404': { description: 'User not found', content: { 'application/json': { schema: { $ref: '#/components/schemas/ErrorResponse' } } } },
         },
       },
     },

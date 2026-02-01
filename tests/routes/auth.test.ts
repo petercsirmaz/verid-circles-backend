@@ -26,6 +26,7 @@ describe('POST /api/auth/register', () => {
     expect(response.body.user).toBeDefined();
     expect(response.body.user.email).toBe(email);
     expect(response.body.user.phoneNumber).toBe(phoneNumber);
+    expect(response.body.user.verificationId).toBeDefined();
     expect(response.body.user.password).toBeUndefined();
   });
 
@@ -108,7 +109,7 @@ describe('POST /api/auth/verify-code', () => {
   it('verifies a user and returns a token', async () => {
     const email = `verify.user.${Date.now()}@example.com`;
 
-    await request(app).post('/api/auth/register').send({
+    const registerResponse = await request(app).post('/api/auth/register').send({
       firstName: 'Verify',
       lastName: 'User',
       email,
@@ -116,11 +117,12 @@ describe('POST /api/auth/verify-code', () => {
       password: 'password123',
     });
 
-    const code = __authTest.verificationCodes.get(email);
+    const verificationId = registerResponse.body.user.verificationId;
+    const code = __authTest.verificationCodes.get(verificationId);
     expect(code).toBeDefined();
 
     const response = await request(app).post('/api/auth/verify-code').send({
-      email,
+      verificationId,
       code,
     });
 
@@ -133,7 +135,7 @@ describe('POST /api/auth/verify-code', () => {
   it('rejects invalid verification code', async () => {
     const email = `badcode.user.${Date.now()}@example.com`;
 
-    await request(app).post('/api/auth/register').send({
+    const registerResponse = await request(app).post('/api/auth/register').send({
       firstName: 'Bad',
       lastName: 'Code',
       email,
@@ -141,8 +143,9 @@ describe('POST /api/auth/verify-code', () => {
       password: 'password123',
     });
 
+    const verificationId = registerResponse.body.user.verificationId;
     const response = await request(app).post('/api/auth/verify-code').send({
-      email,
+      verificationId,
       code: '000000',
     });
 
@@ -153,7 +156,7 @@ describe('POST /api/auth/verify-code', () => {
 
   it('returns 400 when code is missing', async () => {
     const response = await request(app).post('/api/auth/verify-code').send({
-      email: 'missing.code@example.com',
+      verificationId: 'missing-verification-id',
     });
 
     expect(response.status).toBe(400);
@@ -170,7 +173,7 @@ describe('POST /api/auth/login', () => {
     const email = `login.user.${Date.now()}@example.com`;
     const password = 'password123';
 
-    await request(app).post('/api/auth/register').send({
+    const registerResponse = await request(app).post('/api/auth/register').send({
       firstName: 'Login',
       lastName: 'User',
       email,
@@ -178,11 +181,12 @@ describe('POST /api/auth/login', () => {
       password,
     });
 
-    const code = __authTest.verificationCodes.get(email);
+    const verificationId = registerResponse.body.user.verificationId;
+    const code = __authTest.verificationCodes.get(verificationId);
     expect(code).toBeDefined();
 
     await request(app).post('/api/auth/verify-code').send({
-      email,
+      verificationId,
       code,
     });
 
@@ -216,12 +220,13 @@ describe('POST /api/auth/login', () => {
     expect(response.status).toBe(403);
     expect(response.body.error).toBeDefined();
     expect(response.body.field).toBe('email');
+    expect(response.body.verificationId).toBeDefined();
   });
 
   it('rejects invalid password', async () => {
     const email = `wrongpass.user.${Date.now()}@example.com`;
 
-    await request(app).post('/api/auth/register').send({
+    const registerResponse = await request(app).post('/api/auth/register').send({
       firstName: 'Wrong',
       lastName: 'Password',
       email,
@@ -229,11 +234,12 @@ describe('POST /api/auth/login', () => {
       password: 'password123',
     });
 
-    const code = __authTest.verificationCodes.get(email);
+    const verificationId = registerResponse.body.user.verificationId;
+    const code = __authTest.verificationCodes.get(verificationId);
     expect(code).toBeDefined();
 
     await request(app).post('/api/auth/verify-code').send({
-      email,
+      verificationId,
       code,
     });
 
@@ -265,7 +271,7 @@ describe('POST /api/auth/set-password', () => {
   it('updates password for authenticated user', async () => {
     const email = `setpass.user.${Date.now()}@example.com`;
 
-    await request(app).post('/api/auth/register').send({
+    const registerResponse = await request(app).post('/api/auth/register').send({
       firstName: 'Set',
       lastName: 'Password',
       email,
@@ -273,11 +279,12 @@ describe('POST /api/auth/set-password', () => {
       password: 'password123',
     });
 
-    const code = __authTest.verificationCodes.get(email);
+    const verificationId = registerResponse.body.user.verificationId;
+    const code = __authTest.verificationCodes.get(verificationId);
     expect(code).toBeDefined();
 
     const verifyResponse = await request(app).post('/api/auth/verify-code').send({
-      email,
+      verificationId,
       code,
     });
 
@@ -322,7 +329,7 @@ describe('POST /api/auth/set-password', () => {
   it('rejects mismatched passwords', async () => {
     const email = `mismatch.user.${Date.now()}@example.com`;
 
-    await request(app).post('/api/auth/register').send({
+    const registerResponse = await request(app).post('/api/auth/register').send({
       firstName: 'Mismatch',
       lastName: 'User',
       email,
@@ -330,11 +337,12 @@ describe('POST /api/auth/set-password', () => {
       password: 'password123',
     });
 
-    const code = __authTest.verificationCodes.get(email);
+    const verificationId = registerResponse.body.user.verificationId;
+    const code = __authTest.verificationCodes.get(verificationId);
     expect(code).toBeDefined();
 
     const verifyResponse = await request(app).post('/api/auth/verify-code').send({
-      email,
+      verificationId,
       code,
     });
 
@@ -361,7 +369,7 @@ describe('Auth middleware', () => {
   it('attaches user email to request', async () => {
     const email = `middleware.user.${Date.now()}@example.com`;
 
-    await request(app).post('/api/auth/register').send({
+    const registerResponse = await request(app).post('/api/auth/register').send({
       firstName: 'Middleware',
       lastName: 'User',
       email,
@@ -369,11 +377,12 @@ describe('Auth middleware', () => {
       password: 'password123',
     });
 
-    const code = __authTest.verificationCodes.get(email);
+    const verificationId = registerResponse.body.user.verificationId;
+    const code = __authTest.verificationCodes.get(verificationId);
     expect(code).toBeDefined();
 
     const verifyResponse = await request(app).post('/api/auth/verify-code').send({
-      email,
+      verificationId,
       code,
     });
 
@@ -397,7 +406,7 @@ describe('GET /api/auth/me', () => {
   it('returns current user for authenticated request', async () => {
     const email = `me.user.${Date.now()}@example.com`;
 
-    await request(app).post('/api/auth/register').send({
+    const registerResponse = await request(app).post('/api/auth/register').send({
       firstName: 'Me',
       lastName: 'User',
       email,
@@ -405,11 +414,12 @@ describe('GET /api/auth/me', () => {
       password: 'password123',
     });
 
-    const code = __authTest.verificationCodes.get(email);
+    const verificationId = registerResponse.body.user.verificationId;
+    const code = __authTest.verificationCodes.get(verificationId);
     expect(code).toBeDefined();
 
     const verifyResponse = await request(app).post('/api/auth/verify-code').send({
-      email,
+      verificationId,
       code,
     });
 
@@ -441,7 +451,7 @@ describe('POST /api/auth/logout', () => {
   it('removes the session token', async () => {
     const email = `logout.user.${Date.now()}@example.com`;
 
-    await request(app).post('/api/auth/register').send({
+    const registerResponse = await request(app).post('/api/auth/register').send({
       firstName: 'Logout',
       lastName: 'User',
       email,
@@ -449,11 +459,12 @@ describe('POST /api/auth/logout', () => {
       password: 'password123',
     });
 
-    const code = __authTest.verificationCodes.get(email);
+    const verificationId = registerResponse.body.user.verificationId;
+    const code = __authTest.verificationCodes.get(verificationId);
     expect(code).toBeDefined();
 
     const verifyResponse = await request(app).post('/api/auth/verify-code').send({
-      email,
+      verificationId,
       code,
     });
 
@@ -473,5 +484,120 @@ describe('POST /api/auth/logout', () => {
 
     expect(response.status).toBe(401);
     expect(response.body.error).toBeDefined();
+  });
+});
+
+describe('GET /api/auth/verification-status', () => {
+  beforeEach(() => {
+    __authTest.reset();
+  });
+
+  it('returns verification status for a valid verification id', async () => {
+    const email = `status.user.${Date.now()}@example.com`;
+
+    const registerResponse = await request(app).post('/api/auth/register').send({
+      firstName: 'Status',
+      lastName: 'User',
+      email,
+      phoneNumber: '+14155552684',
+      password: 'password123',
+    });
+
+    const verificationId = registerResponse.body.user.verificationId;
+    expect(verificationId).toBeDefined();
+
+    const response = await request(app)
+      .get('/api/auth/verification-status')
+      .query({ verificationId });
+
+    expect(response.status).toBe(200);
+    expect(response.body.verified).toBe(false);
+  });
+
+  it('returns 404 for unknown verification id', async () => {
+    const response = await request(app)
+      .get('/api/auth/verification-status')
+      .query({ verificationId: 'missing-verification-id' });
+
+    expect(response.status).toBe(404);
+    expect(response.body.field).toBe('verificationId');
+  });
+});
+
+describe('POST /api/auth/forgot-password', () => {
+  beforeEach(() => {
+    __authTest.reset();
+  });
+
+  it('issues a reset token for existing user', async () => {
+    const email = `forgot.user.${Date.now()}@example.com`;
+
+    await request(app).post('/api/auth/register').send({
+      firstName: 'Forgot',
+      lastName: 'User',
+      email,
+      phoneNumber: '+14155552685',
+      password: 'password123',
+    });
+
+    const response = await request(app).post('/api/auth/forgot-password').send({ email });
+
+    expect(response.status).toBe(200);
+    expect(response.body.message).toBeDefined();
+    expect(response.body.token).toBeDefined();
+  });
+
+  it('returns 404 for unknown email', async () => {
+    const response = await request(app)
+      .post('/api/auth/forgot-password')
+      .send({ email: 'missing.user@example.com' });
+
+    expect(response.status).toBe(404);
+    expect(response.body.field).toBe('email');
+  });
+});
+
+describe('POST /api/auth/reset-password', () => {
+  beforeEach(() => {
+    __authTest.reset();
+  });
+
+  it('resets password with a valid token', async () => {
+    const email = `reset.user.${Date.now()}@example.com`;
+
+    await request(app).post('/api/auth/register').send({
+      firstName: 'Reset',
+      lastName: 'User',
+      email,
+      phoneNumber: '+14155552686',
+      password: 'password123',
+    });
+
+    const forgotResponse = await request(app)
+      .post('/api/auth/forgot-password')
+      .send({ email });
+
+    const token = forgotResponse.body.token;
+    expect(token).toBeDefined();
+
+    const response = await request(app).post('/api/auth/reset-password').send({
+      token,
+      password: 'newpassword123',
+      confirmPassword: 'newpassword123',
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body.message).toBeDefined();
+  });
+
+  it('rejects invalid reset token', async () => {
+    const response = await request(app).post('/api/auth/reset-password').send({
+      token: 'invalid-token',
+      password: 'newpassword123',
+      confirmPassword: 'newpassword123',
+    });
+
+    expect(response.status).toBe(403);
+    expect(response.body.field).toBe('token');
   });
 });
